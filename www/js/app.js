@@ -1,19 +1,92 @@
-// Ionic Starter App
+angular.module('todo', ['ionic'])
+  .factory('Projects', function() {
+    return {
+      all: function() {
+        var projectString = window.localStorage['projects'];
+        if (projectString) {
+          return angular.fromJson(projectString);
+        }
+        return [];
+      },
 
-// angular.module is a global place for creating, registering and retrieving Angular modules
-// 'starter' is the name of this angular module example (also set in a <body> attribute in index.html)
-// the 2nd parameter is an array of 'requires'
-angular.module('starter', ['ionic'])
+      save: function(projects) {
+        window.localStorage['projects'] = angular.toJson(projects);
+      },
 
-.run(function($ionicPlatform) {
-  $ionicPlatform.ready(function() {
-    // Hide the accessory bar by default (remove this to show the accessory bar above the keyboard
-    // for form inputs)
-    if(window.cordova && window.cordova.plugins.Keyboard) {
-      cordova.plugins.Keyboard.hideKeyboardAccessoryBar(true);
+      newProject: function(projectTitle) {
+        return {
+          title: projectTitle,
+          tasks: []
+        };
+      },
+
+      getLastActiveIndex: function() {
+        return parseInt(window.localStorage['lastActiveProject']) || 0;
+      },
+
+      setLastActiveIndex: function(index) {
+        window.localStorage['lastActiveProject'] = index;
+      }
     }
-    if(window.StatusBar) {
-      StatusBar.styleDefault();
+  })
+
+  .controller('TodoCtrl', function($scope, $timeout, $ionicModal, Projects, $ionicSideMenuDelegate) {
+    $scope.projects = Projects.all();
+    $scope.activeProject = $scope.projects[Projects.getLastActiveIndex()];
+
+    var createProject = function(projectTitle) {
+      var newProject = Projects.newProject(projectTitle);
+      $scope.projects.push(newProject);
+      Projects.save($scope.projects);
+      $scope.selectProject(newProject, $scope.projects.length - 1);
     }
+
+    $scope.newProject = function() {
+      var projectTitle = prompt('Project name');
+      if (projectTitle) { createProject(projectTitle); }
+    };
+
+    $scope.selectProject = function(project, index) {
+      $scope.activeProject = project;
+      Projects.setLastActiveIndex(index);
+      $ionicSideMenuDelegate.toggleLeft(false);
+    }
+
+    $ionicModal.fromTemplateUrl('new-task.html', function(modal) {
+      $scope.taskModal = modal;
+    }, {
+      scope: $scope
+    });
+
+    $scope.closeNewTask = function() { $scope.taskModal.hide() };
+
+    $scope.createTask = function(task) {
+      if(!$scope.activeProject || !task) { return; }
+
+      $scope.activeProject.tasks.push({ title: task.title });
+
+      Projects.save($scope.projects);
+
+      $scope.taskModal.hide();
+      task.title = '';
+    };
+
+    $scope.toggleProjects = function() { $ionicSideMenuDelegate.toggleLeft() }
+
+    $scope.newTask = function() {  $scope.taskModal.show() };
+
+    $timeout(function() {
+      if ($scope.projects.length == 0) {
+        while(true) {
+          var projectTitle = prompt('Your first project title:');
+
+          if(projectTitle) {
+            createProject(projectTitle);
+            break;
+          }
+        }
+      }
+    });
+
   });
-})
+
